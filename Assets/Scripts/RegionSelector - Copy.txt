@@ -1,0 +1,614 @@
+﻿using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
+using DG.Tweening;
+
+public enum GameState
+{
+    Welcome,
+    McqFinished
+}
+
+public class RegionSelector : MonoBehaviour
+{
+    [SerializeField] List<GameObject> regionsList;
+    [SerializeField] GameObject tickMark, blurredImage, numberImage, gameStateHolder, cityBg, IntroUI, mcqUI, mcqUiElements, mcqUiAnswers, selectedRegion, pointer, additionalInfoUI, retryTxt, scoreUI, showScoreBtn, introUIParent, scoreHud, regionInfoUI;
+    public string correctOption1;
+    [SerializeField] int totalScore, ecoScore, polScore, envScore, budgetScore, otherScore, introUIState;
+    [SerializeField] Text mcqQues, totScoreTxt, ecoScoreTxt, polScoreTxt, envScoreTxt, budgetScoreTxt, starsTxt, rankTxt, hudBudgetTxt, regionInfoTitle, regionInfoDescription;
+    public List<int> optionAScores, optionBScores, optionCScores;
+    public bool _canShowUi, _uiOnScreen;
+    [SerializeField] GameState gState;
+    [SerializeField] Sprite region3SpriteOriginal, region3SpriteGlowing;
+
+    // Start is called before the first frame update
+    void Start()
+    {
+        gameStateHolder = GameObject.Find("GameStateHolder");
+
+        introUIState = -1;
+        budgetScore = 1000;
+
+        gState = GameState.Welcome;
+
+        _canShowUi = true;
+
+        LevelSetup();
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+        if (IntroUI.activeInHierarchy == false && _canShowUi) SelectRegion();
+        if (introUIParent.activeInHierarchy == true && _canShowUi)
+        {
+            if (Input.GetKeyUp(KeyCode.Mouse0))
+            {
+                ChangeText();
+            }
+        }
+
+        if (Input.touchCount == 0 && _canShowUi == false)
+        {
+            _canShowUi = true;
+            regionInfoUI.transform.parent.gameObject.SetActive(true);
+        }
+
+        if (regionInfoUI.activeInHierarchy) _uiOnScreen = true;
+        else if (!regionInfoUI.activeInHierarchy) _uiOnScreen = false;
+    }
+
+    void SelectRegion()
+    {
+        Vector3 raycastPos = new Vector3(Camera.main.ScreenToWorldPoint(Input.mousePosition).x, Camera.main.ScreenToWorldPoint(Input.mousePosition).y, -20);
+
+        if (Input.GetKeyUp(KeyCode.Mouse0) && !mcqUI.activeInHierarchy && !scoreUI.activeInHierarchy && !regionInfoUI.activeInHierarchy)
+        {
+            RaycastHit2D hit = Physics2D.Raycast(raycastPos, Vector3.forward, Mathf.Infinity);
+            if (hit && hit.collider.transform.tag == "Region" && gState == GameState.Welcome)
+            {
+                BlurAll();
+
+                selectedRegion = hit.collider.gameObject;
+
+                Camera.main.transform.DOMove(new Vector3(selectedRegion.transform.position.x + 9, selectedRegion.transform.position.y, -10), .25f);
+                Camera.main.DOOrthoSize(7, .25f);
+
+                //for (int i = 0; i < selectedRegion.transform.childCount; i++)
+                //{
+                //    selectedRegion.transform.GetChild(i).GetComponent<SpriteRenderer>().color = new Color(1, 1, 1, 1);
+                //}
+
+                mcqUI.SetActive(false);
+                mcqUiElements.SetActive(false);
+                mcqUI.GetComponent<RectTransform>().DOSizeDelta(Vector2.zero, 0);
+                mcqUI.SetActive(true);
+
+                if (selectedRegion.GetComponent<RegionTracker>().questionIndx <= 3)
+                {
+                    mcqUI.GetComponent<RectTransform>().DOSizeDelta(new Vector2(1500, 750), .25f).OnComplete(delegate
+                    {
+                        mcqUiElements.SetActive(true);
+                        mcqUiAnswers.SetActive(true);
+                        gameObject.GetComponent<QuestionLoader>().LoadMap(selectedRegion.GetComponent<RegionTracker>().questionIndx);
+                        Debug.Log(selectedRegion.GetComponent<RegionTracker>().questionIndx);
+                    });
+                }
+
+                else if (selectedRegion.GetComponent<RegionTracker>().questionIndx > 3)
+                {
+                    mcqUI.GetComponent<RectTransform>().DOSizeDelta(new Vector2(1500, 750), .25f).OnComplete(delegate
+                    {
+                        mcqUiElements.SetActive(true);
+                        mcqUiAnswers.SetActive(false);
+                        mcqQues.text = "Region Completed.";
+                    });
+                }
+
+                pointer.SetActive(false);
+            }
+
+            else if (hit && gState == GameState.McqFinished)
+            {
+                BlurAll();
+
+                selectedRegion = hit.collider.gameObject;
+
+                ShowRegionInfo();
+            }
+        }
+    }
+
+    void ShowRegionInfo()
+    {
+        Camera.main.transform.DOMove(new Vector3(selectedRegion.transform.position.x + 9, selectedRegion.transform.position.y, -10), .25f);
+        Camera.main.DOOrthoSize(7, .25f);
+
+        //for (int i = 0; i < selectedRegion.transform.childCount; i++)
+        //{
+            selectedRegion.GetComponent<SpriteRenderer>().color = new Color(1, 1, 1, 1);
+        //}
+
+        regionInfoUI.SetActive(false);
+        regionInfoUI.transform.GetChild(0).gameObject.SetActive(false);
+        regionInfoUI.GetComponent<RectTransform>().DOSizeDelta(Vector2.zero, 0);
+
+        if (selectedRegion.transform.CompareTag("Region_1"))
+        {
+            regionInfoTitle.text = "Zone 1";
+            regionInfoDescription.text = "Water consumption: " + (int)Random.Range(5000, 10000) + " kL/Day, Sewage Production: " + (int)Random.Range(3000, 8000) + " kL/Day.";
+        }
+
+        else if (selectedRegion.transform.CompareTag("Region_2"))
+        {
+            regionInfoTitle.text = "Zone 2";
+            regionInfoDescription.text = "Water consumption: " + (int)Random.Range(800, 2000) + " kL/Day, Sewage Production: " + (int)Random.Range(1000, 3000) + " kL/Day.";
+        }
+
+        else if (selectedRegion.transform.CompareTag("Region_3"))
+        {
+            regionInfoTitle.text = "Zone 3";
+            regionInfoDescription.text = "Water consumption: " + (int)Random.Range(2000, 5000) + " kL/Day, Sewage Production: " + (int)Random.Range(1000, 3000) + " kL/Day.";
+        }
+
+        else if (selectedRegion.transform.CompareTag("Region_4"))
+        {
+            regionInfoTitle.text = "Zone 4";
+            regionInfoDescription.text = "Water consumption: " + (int)Random.Range(2500, 5500) + " kL/Day, Sewage Production: " + (int)Random.Range(1500, 3500) + " kL/Day.";
+        }
+
+        else if (selectedRegion.transform.CompareTag("Region_5"))
+        {
+            regionInfoTitle.text = "Zone 5";
+            regionInfoDescription.text = "Water consumption: " + (int)Random.Range(1800, 2500) + " kL/Day, Sewage Production: " + (int)Random.Range(2500, 4500) + " kL/Day.";
+        }
+
+        else if (selectedRegion.transform.CompareTag("Region_6"))
+        {
+            regionInfoTitle.text = "Zone 6";
+            regionInfoDescription.text = "Water consumption: " + (int)Random.Range(8000, 15000) + " kL/Day, Sewage Production: " + (int)Random.Range(7000, 12000) + " kL/Day.";
+        }
+
+        //else if (selectedRegion.transform.CompareTag("ShipYard"))
+        //{
+        //    regionInfoTitle.text = "Ship Yard";
+        //    regionInfoDescription.text = "Water consumption: 500 kL/Day, Sewage Production: 300 kL/Day";
+        //}
+
+        //else if (selectedRegion.transform.CompareTag("OilWell"))
+        //{
+        //    regionInfoTitle.text = "OilWell";
+        //    regionInfoDescription.text = "Water consumption: 2000 kL/Day, Sewage Production: 100 kL/Day";
+        //}
+
+        regionInfoUI.SetActive(true);
+        regionInfoUI.GetComponent<RectTransform>().DOSizeDelta(new Vector2(1500, 750), 0.25f).OnComplete(delegate
+        {
+            regionInfoUI.transform.GetChild(0).gameObject.SetActive(true);
+        });
+    }
+
+    void ChangeTags()
+    {
+        for (int i = 0; i < regionsList.Count; i++)
+        {
+            regionsList[i].transform.tag = regionsList[i].GetComponent<RegionTracker>().regionTag;
+        }
+    }
+
+    void BlurAll()
+    {
+        if (selectedRegion.transform.CompareTag("Region"))
+        {
+            blurredImage.SetActive(true);
+            numberImage.SetActive(false);
+            selectedRegion.GetComponent<SpriteRenderer>().sprite = region3SpriteGlowing;
+        }
+
+        else
+        {
+            cityBg.GetComponent<SpriteRenderer>().color = new Color(1, 1, 1, .25f);
+
+            for (int i = 0; i < regionsList.Count; i++)
+            {
+                //for (int k = 0; k < regionsList[i].transform.childCount; k++)
+                //{
+                    regionsList[i].GetComponent<SpriteRenderer>().color = new Color(.5f, .5f, .5f, .25f);
+                //}
+            }
+        }
+
+    }
+
+    void UnBlurAll()
+    {
+        if (selectedRegion.transform.CompareTag("Region"))
+        {
+            blurredImage.SetActive(false);
+            numberImage.SetActive(true);
+            selectedRegion.GetComponent<SpriteRenderer>().sprite = region3SpriteOriginal;
+        }
+
+        else
+        {
+            cityBg.GetComponent<SpriteRenderer>().color = new Color(1, 1, 1, 1);
+
+            for (int i = 0; i < regionsList.Count; i++)
+            {
+                //for (int k = 0; k < regionsList[i].transform.childCount; k++)
+                //{
+                    regionsList[i].GetComponent<SpriteRenderer>().color = new Color(1, 1, 1, 1);
+                //}
+            }
+        }
+    }
+
+    public void CloseRegionInfoUI()
+    {
+        regionInfoUI.transform.GetChild(0).gameObject.SetActive(false);
+        regionInfoUI.GetComponent<RectTransform>().DOSizeDelta(Vector2.zero, 0.25f).OnComplete(delegate
+        {
+            regionInfoUI.SetActive(false);
+            UnBlurAll();
+            Camera.main.transform.DOMove(new Vector3(0, 0, -10), .25f);
+            Camera.main.DOOrthoSize(8, .25f);
+        });
+    }
+
+    public void CloseMcqUI()
+    {
+        mcqUiElements.SetActive(false);
+        mcqUI.GetComponent<RectTransform>().DOSizeDelta(Vector2.zero, 0.25f).OnComplete(delegate
+        {
+            mcqUI.SetActive(false);
+            UnBlurAll();
+            Camera.main.transform.DOMove(new Vector3(0, 0, -10), .25f);
+            Camera.main.DOOrthoSize(8, .25f);
+
+            if (selectedRegion.GetComponent<RegionTracker>().questionIndx > 3)
+            {
+                ShowScore();
+                ChangeTags();
+                if (PlayerPrefs.GetString("GameState") == "Advanced") PlayerPrefs.SetString("GameState", "Gameplay");
+                //Camera.main.GetComponent<PanZoom>().enabled = true;
+                //Camera.main.GetComponent<ZoomLevelDisplay>().enabled = true;
+                //gState = GameState.McqFinished;
+            }
+        });
+    }
+
+    IEnumerator ShowTick()
+    {
+        tickMark.SetActive(true);
+
+        mcqQues.gameObject.SetActive(false);
+        mcqUiAnswers.SetActive(false);
+
+        yield return new WaitForSeconds(1);
+
+        tickMark.SetActive(false);
+
+        if (selectedRegion.GetComponent<RegionTracker>().questionIndx > 1)
+        {
+            CloseMcqUI();
+            ShowIntroUIAgain();
+            if (PlayerPrefs.GetString("GameState", "Intermediate") == "Intermediate") PlayerPrefs.SetString("GameState", "Advanced");
+        }
+
+        else gameObject.GetComponent<QuestionLoader>().LoadMap(selectedRegion.GetComponent<RegionTracker>().questionIndx);
+
+        mcqQues.gameObject.SetActive(true);
+        mcqUiAnswers.SetActive(true);
+
+        StopCoroutine(ShowTick());
+    }
+
+    public void CheckAnswer(string option)
+    {
+        if (selectedRegion.GetComponent<RegionTracker>().questionIndx <= 1)
+        {
+            if (option == correctOption1)
+            {
+                otherScore += 10;
+                selectedRegion.GetComponent<RegionTracker>().questionIndx++;
+
+                StartCoroutine(ShowTick());
+                
+            }
+
+            else if (option != correctOption1)
+            {
+                mcqQues.gameObject.SetActive(false);
+                mcqUiAnswers.SetActive(false);                
+                retryTxt.SetActive(true);
+            }
+        }
+
+        else if (selectedRegion.GetComponent<RegionTracker>().questionIndx > 1)
+        {
+            if (option == "A")
+            {
+                ecoScore += optionAScores[0];
+                polScore += optionAScores[1];
+                envScore += optionAScores[2];
+                budgetScore += optionAScores[3];
+
+                selectedRegion.GetComponent<RegionTracker>().questionIndx++;
+
+                if (selectedRegion.GetComponent<RegionTracker>().questionIndx > 3) CloseMcqUI();
+
+                else gameObject.GetComponent<QuestionLoader>().LoadMap(selectedRegion.GetComponent<RegionTracker>().questionIndx);
+            }
+
+            else if (option == "B")
+            {
+                ecoScore += optionBScores[0];
+                polScore += optionBScores[1];
+                envScore += optionBScores[2];
+                budgetScore += optionBScores[3];
+
+                selectedRegion.GetComponent<RegionTracker>().questionIndx++;
+
+                if (selectedRegion.GetComponent<RegionTracker>().questionIndx > 3) CloseMcqUI();
+
+                else gameObject.GetComponent<QuestionLoader>().LoadMap(selectedRegion.GetComponent<RegionTracker>().questionIndx);
+            }
+
+            else if (option == "C")
+            {
+                ecoScore += optionCScores[0];
+                polScore += optionCScores[1];
+                envScore += optionCScores[2];
+                budgetScore += optionCScores[3];
+
+                selectedRegion.GetComponent<RegionTracker>().questionIndx++;
+
+                if (selectedRegion.GetComponent<RegionTracker>().questionIndx > 3) CloseMcqUI();
+
+                else gameObject.GetComponent<QuestionLoader>().LoadMap(selectedRegion.GetComponent<RegionTracker>().questionIndx);
+            }
+            //showScoreBtn.SetActive(true);
+            UpdateScoreHUD();
+        }
+    }
+
+    public void ShowAdditionalInfo()
+    {
+        additionalInfoUI.GetComponent<RectTransform>().DOSizeDelta(Vector2.zero, 0);
+        additionalInfoUI.SetActive(true);
+        additionalInfoUI.transform.GetChild(0).gameObject.SetActive(false);
+
+        mcqQues.gameObject.SetActive(false);
+        mcqUiAnswers.SetActive(false);
+        additionalInfoUI.GetComponent<RectTransform>().DOSizeDelta(new Vector2(750, 300), .25f).OnComplete(delegate
+        {
+            additionalInfoUI.transform.GetChild(0).gameObject.SetActive(true);
+        });
+    }
+
+    public void CloseAdditionalInfoUI()
+    {
+        additionalInfoUI.transform.GetChild(0).gameObject.SetActive(false);
+        additionalInfoUI.GetComponent<RectTransform>().DOSizeDelta(Vector2.zero, .25f).OnComplete(delegate
+        {
+            additionalInfoUI.SetActive(false);
+
+            mcqQues.gameObject.SetActive(true);
+            mcqUiAnswers.SetActive(true);
+
+        });
+    }
+
+    public void Retry()
+    {
+        retryTxt.SetActive(false);
+        mcqQues.gameObject.SetActive(true);
+        mcqUiAnswers.SetActive(true);
+        gameObject.GetComponent<QuestionLoader>().LoadMap(selectedRegion.GetComponent<RegionTracker>().questionIndx);
+    }
+
+    public void ShowScore()
+    {
+        Debug.Log("scoreBtnPressed");
+
+        if (scoreUI.activeInHierarchy)
+        {
+            scoreUI.transform.GetChild(0).gameObject.SetActive(false);
+            scoreHud.SetActive(true);
+            scoreUI.GetComponent<RectTransform>().DOSizeDelta(Vector2.zero, .25f).OnComplete(delegate
+            {
+                scoreUI.SetActive(false);
+                DisplayFtueFinishedText();
+            });
+        }
+
+        else
+        {
+            scoreUI.GetComponent<RectTransform>().DOSizeDelta(Vector2.zero, 0);
+            scoreUI.SetActive(true);
+
+            totalScore = otherScore + ecoScore + polScore + envScore + budgetScore;
+
+            totScoreTxt.text = "Total Score: " + totalScore;
+            ecoScoreTxt.text = "Economy: " + ecoScore;
+            polScoreTxt.text = "Politics: " + polScore;
+            envScoreTxt.text = "Environment: " + envScore;
+            budgetScoreTxt.text = "Budget: $" + budgetScore;
+
+            if (budgetScore == 975) starsTxt.text = "*";
+            else if (budgetScore == 1000) starsTxt.text = "**";
+            else if (budgetScore == 1050) starsTxt.text = "***";
+
+            if (ecoScore == 50) rankTxt.text = "Rank: I";
+            else if (ecoScore != 50 && polScore == 50) rankTxt.text = "Rank: II";
+            else if (ecoScore != 50 && polScore != 100 && envScore == 0) rankTxt.text = "Rank: III";
+            else if (ecoScore != 50 && polScore != 100 && envScore != 25) rankTxt.text = "Rank: IV";
+
+            scoreUI.GetComponent<RectTransform>().DOSizeDelta(new Vector2(1000, 550), .25f).OnComplete(delegate
+            {
+                scoreUI.transform.GetChild(0).gameObject.SetActive(true);
+                scoreHud.SetActive(false);
+            });
+        }
+    }
+
+    void ShowIntroUIAgain()
+    {
+        introUIState = 0;
+        gameObject.GetComponent<IntroUI>().enabled = false;
+        introUIParent.SetActive(true);
+        introUIParent.transform.GetChild(0).gameObject.GetComponent<Text>().text = "Congratulations!!";
+        introUIParent.GetComponent<RectTransform>().DOMoveY(175, .25f);
+    }
+
+    void ChangeText()
+    {
+        if (introUIState == 0)
+        {
+            introUIParent.transform.GetChild(0).gameObject.GetComponent<Text>().text = "You Completed the intermediate level and have reached the Advanced level.";
+            introUIState++;
+        }
+
+        else if (introUIState == 1)
+        {
+            introUIParent.transform.GetChild(0).gameObject.GetComponent<Text>().text = "But the city is facing some sanitation issues.";
+            introUIState++;
+        }
+
+        else if (introUIState == 2)
+        {
+            introUIParent.transform.GetChild(0).gameObject.GetComponent<Text>().text = "Tap on the indicated region to help solve the issue.";
+            introUIState++;
+        }
+
+        else if (introUIState == 3)
+        {
+            DisableIntroUI();
+        }
+
+        else if (introUIState == 4)
+        {
+            introUIParent.transform.GetChild(0).gameObject.GetComponent<Text>().text = "It is now safe for you to freely roam around the city.";
+            introUIState++;
+        }
+
+        else if (introUIState == 5)
+        {
+            introUIParent.transform.GetChild(0).gameObject.GetComponent<Text>().text = "Tap on any region to view information about that region.";
+            introUIState++;
+        }
+
+        else if (introUIState == 6)
+        {
+            introUIParent.transform.GetChild(0).gameObject.GetComponent<Text>().text = "To zoom in or zoom out the camera, use pinch gesture.";
+            introUIState++;
+        }
+
+        else if (introUIState == 7)
+        {
+            introUIParent.transform.GetChild(0).gameObject.GetComponent<Text>().text = "Hold and drag to pan the camera.";
+            introUIState++;
+        }
+
+        else if (introUIState == 8)
+        {
+            introUIParent.transform.GetChild(0).gameObject.GetComponent<Text>().text = "Enjoy your stay!!";
+            introUIState++;
+        }
+
+        else if (introUIState == 9)
+        {
+            DisableIntroUI();
+        }
+    }
+
+    void DisableIntroUI()
+    {
+        if (introUIParent.activeInHierarchy)
+        {
+            introUIParent.GetComponent<RectTransform>().DOMoveY(-375, .25f).OnComplete(delegate
+            {
+                introUIParent.SetActive(false);
+                pointer.SetActive(true);
+
+                if (introUIState == 9)
+                {
+                    pointer.SetActive(false);
+                    Camera.main.GetComponent<PanZoom>().enabled = true;
+                    Camera.main.GetComponent<ZoomLevelDisplay>().enabled = true;
+                    gState = GameState.McqFinished;
+                }
+
+            });
+
+
+        }
+    }
+
+    void UpdateScoreHUD()
+    {
+        hudBudgetTxt.text = "Budget: $" + budgetScore;
+
+        if (!scoreHud.activeInHierarchy)
+        {
+            scoreHud.GetComponent<RectTransform>().DOSizeDelta(Vector2.zero, 0);
+            scoreHud.transform.GetChild(0).gameObject.SetActive(false);
+            scoreHud.SetActive(true);
+            scoreHud.GetComponent<RectTransform>().DOSizeDelta(new Vector2(200, 150), .25f).OnComplete(delegate
+            {
+                scoreHud.transform.GetChild(0).gameObject.SetActive(true);
+            });
+        }
+
+    }
+
+    public void ResetAndRetry()
+    {
+        ecoScore = 0;
+        polScore = 0;
+        envScore = 0;
+        budgetScore = 1000;
+        otherScore = 0;
+        totalScore = 0;
+
+        selectedRegion.GetComponent<RegionTracker>().questionIndx = 0;
+        ShowScore();
+        pointer.SetActive(true);
+        scoreHud.SetActive(false);
+        //showScoreBtn.SetActive(false);
+    }
+
+    void DisplayFtueFinishedText()
+    {
+        introUIState = 4;
+        gameObject.GetComponent<IntroUI>().enabled = false;
+        introUIParent.SetActive(true);
+        introUIParent.transform.GetChild(0).gameObject.GetComponent<Text>().text = "Thank you for helping us solve the issue.";
+        introUIParent.GetComponent<RectTransform>().DOMoveY(175, .25f);
+    }
+
+    void LevelSetup()
+    {
+        if (gameStateHolder.GetComponent<GameStateHolder>().gameStateToLoad == "Advanced")
+        {
+            ShowIntroUIAgain();
+
+            otherScore = 20;
+
+            selectedRegion.GetComponent<RegionTracker>().questionIndx = 2;
+        }
+
+        else if (gameStateHolder.GetComponent<GameStateHolder>().gameStateToLoad == "Gameplay")
+        {
+            DisplayFtueFinishedText();
+            ChangeTags();
+            selectedRegion.GetComponent<RegionTracker>().questionIndx = 4;
+        }
+    }
+
+    public void LoadMainMenu()
+    {
+        UnityEngine.SceneManagement.SceneManager.LoadScene(0);
+    }
+}
